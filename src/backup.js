@@ -98,21 +98,50 @@ const execCurl = async (container, url)=>{
 
 }
 
-
-const cleanup = async (container, containerPath, localeFile)=>{
-    winston.debug(`Begin cleanup`);
-
+const dockerExec = async(container, cmd)=>{
     const bashContainer = await container.exec.create({
         AttachStdout: true,
         AttachStderr: true,
-        Cmd: [ 'rm -rf', containerPath ]
+        Cmd:  cmd
     });
 
     await bashContainer.start({ Detach: false });
+}
 
-    await fsp.unlink(localeFile)
+const cleanup = async (container, solrBackupDir, localeBackupDir)=>{
+    winston.debug(`Begin cleanup`);
+    
+    await dockerExec(container, ['rm -rf', `${solrBackupDir}`]);
+
+    await rmDir(localeBackupDir, true);
+    //rmdir(localeBackupDir, { recursive: true })
 
     winston.debug(`Finished cleanup`);
+}
+const rmDir = async function(dir, rmSelf) {
+    var files;
+    rmSelf = (rmSelf === undefined) ? true : rmSelf;
+    dir = dir + "/";
+    try { 
+        files = await fsp.readdir(dir); 
+    } 
+    catch (e) { 
+        console.log("!Oops, directory not exist."); 
+        return; 
+    }
+    if (files.length > 0) {
+        for(let i=0; i< files.length; i++) {
+            const pathStat = await fsp.stat(dir + files[i]);
+            if (pathStat.isDirectory()) {
+                await rmDir(dir + files[i]);
+            } else {
+                await fsp.unlink(dir + files[i]);
+            }
+        };
+    }
+    if (rmSelf) {
+        await fsp.rmdir(dir);
+    }
 }
 
 const toRegExp = (obj)=> {
@@ -158,40 +187,57 @@ const backup = async ()=>{
 
         if(collectionNames.length>0){
 
-            const snapshotName  = `${new Date().getTime()}`;
-            const fileName      = `${snapshotName}.tar`;
-            const newFileFolder = './backup-files'
-            
+            const snapshotName          = `${new Date().getTime()}`;
+            const localBackupFileName   = `${snapshotName}.tar`;
+            const localBackupFolder     = './backup-files';
+            const solrBackupFolder      = '/tmp/solr-backups';
+
+            try{
+                winston.debug('Initial cleanup')
+                //Delete folders incase they were left from previous run
+                await cleanup(solrContainer, solrBackupFolder, localBackupFolder);
+            }
+            catch(e){}
+
             let backupFolder;
             try{
-                backupFolder = await fsp.stat(newFileFolder);
+                backupFolder = await fsp.stat(localBackupFolder);
             }
             catch(e){}
 
             if(!backupFolder || !backupFolder.isDirectory())
-                await fsp.mkdir(newFileFolder)       
+                await fsp.mkdir(localBackupFolder)       
 
             winston.info(`Collections to backup: ${collectionNames.length}`);
+
+            winston.debug('create backup folder inside solr container');
+                try{
+                    await dockerExec(solrContainer, ['mkdir', `${solrBackupFolder}`]);
+                }
+                catch(e){
+                    console.log(e)
+                }
 
             for (let index = 0; index < collectionNames.length; index++) {
 
                 try{
-                    const backupPath = await backupCollection(solrContainer, collectionNames[index], '/tmp', `${collectionNames[index]}_${snapshotName}`);
+                    
+                    const solrBackupPath = await backupCollection(solrContainer, collectionNames[index], solrBackupFolder, `${collectionNames[index]}_${snapshotName}`);
 
-                    const newFilePath = `${newFileFolder}/${fileName}`;
+                    const localBackupFilePath = `${localBackupFolder}/${localBackupFileName}`;
 
-                    if(backupPath){
+                    if(solrBackupPath){
                         winston.debug(`Reading backup from container`);
-                        const stream = await solrContainer.fs.get({path:backupPath});
+                        const stream = await solrContainer.fs.get({path:solrBackupPath});
 
-                        const file = fs.createWriteStream(newFilePath);
+                        const file = fs.createWriteStream(localBackupFilePath);
                         stream.pipe(file);
 
                         await promisifyStream(stream);
 
-                        await uploadToS3(fileName, newFilePath);
+                        await uploadToS3(localBackupFileName, localBackupFilePath);
 
-                        await cleanup(solrContainer, backupPath, newFilePath);
+                        await cleanup(solrContainer, solrBackupFolder, localBackupFolder);
                     }
                 }
                 catch(e){
