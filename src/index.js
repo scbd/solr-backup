@@ -26,7 +26,7 @@ try{
     winston.info(`Next Schedule ${job.nextDate()}`)
   }
 
-  job = new CronJob('*/1 * * * *', onTick);
+  job = new CronJob(config.CRON_TIME, onTick);
   showNextSchedule();
   job.start();
 }
