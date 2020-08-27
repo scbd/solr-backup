@@ -168,6 +168,9 @@ const backup = async ()=>{
         const list = await docker.container.list();
         const solrContainer = list.find(e=> {
             
+            //skip self
+            if(/scbd\:solr\-backup/.test(e.data.Image)) return false;
+
             if(containerName)
                 return e.data.Names.find(name=>name.match(containerName));
 
