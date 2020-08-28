@@ -5,7 +5,6 @@ const AWS     = require('aws-sdk');
 const fsp     = require('fs').promises;
 const fs      = require('fs');
 var zlib      = require('zlib');
-var gz        = zlib.createGzip();
 
 const {Docker} = require('node-docker-api');
 
@@ -236,6 +235,8 @@ const backup = async ()=>{
                         const stream = await solrContainer.fs.get({path:solrBackupPath});
 
                         const file = fs.createWriteStream(localBackupFilePath);
+
+                        const gz = zlib.createGzip();
                         stream.pipe(gz).pipe(file);
 
                         await promisifyStream(stream);
