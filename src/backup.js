@@ -193,7 +193,7 @@ const backup = async ()=>{
         if(collectionNames.length>0){
 
             const snapshotName          = `${new Date().getTime()}`;
-            const localBackupFileName   = `${snapshotName}.gz`;
+            const localBackupFileName   = `${snapshotName}.tar.gz`;
             const localBackupFolder     = './backup-files';
             const solrBackupFolder      = '/tmp/solr-backups';
 
