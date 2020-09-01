@@ -93,6 +93,7 @@ workflows:
   build_and_deploy:
     jobs:
       - build:
+          context: docker-hub
           filters:
             branches:
               ignore:
@@ -103,19 +104,23 @@ workflows:
                 - /^v?[0-9]+(\.[0-9]+)*$/
                 
       - build-deploy-branches:
+          context: docker-hub
           filters:
             branches:
               only: /^(master|dev|stg)$/
       - build-deploy-staging:
+          context: docker-hub
           filters:
             branches:
               only: /^stg\/.*/
       - build_and_deploy_releases:
+          context: docker-hub
           filters:
             branches:
                 only:
                   - /^release\/.*/  
       - build_and_deploy_tags:
+          context: docker-hub
           filters:
             branches:
                 ignore: /.*/

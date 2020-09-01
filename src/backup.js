@@ -4,6 +4,7 @@ const request = require('superagent');
 const AWS     = require('aws-sdk');
 const fsp     = require('fs').promises;
 const fs      = require('fs');
+var zlib      = require('zlib');
 
 const {Docker} = require('node-docker-api');
 
@@ -166,6 +167,9 @@ const backup = async ()=>{
         const list = await docker.container.list();
         const solrContainer = list.find(e=> {
             
+            //skip self
+            if(/scbd\:solr\-backup/.test(e.data.Image)) return false;
+
             if(containerName)
                 return e.data.Names.find(name=>name.match(containerName));
 
@@ -188,7 +192,7 @@ const backup = async ()=>{
         if(collectionNames.length>0){
 
             const snapshotName          = `${new Date().getTime()}`;
-            const localBackupFileName   = `${snapshotName}.tar`;
+            const localBackupFileName   = `${snapshotName}.tar.gz`;
             const localBackupFolder     = './backup-files';
             const solrBackupFolder      = '/tmp/solr-backups';
 
@@ -231,7 +235,9 @@ const backup = async ()=>{
                         const stream = await solrContainer.fs.get({path:solrBackupPath});
 
                         const file = fs.createWriteStream(localBackupFilePath);
-                        stream.pipe(file);
+
+                        const gz = zlib.createGzip();
+                        stream.pipe(gz).pipe(file);
 
                         await promisifyStream(stream);
 

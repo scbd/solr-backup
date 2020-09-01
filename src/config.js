@@ -8,7 +8,9 @@ const config = {
   NODE_ENV        : process.env.NODE_ENV,
   DEBUG_MODE      : process.env.DEBUG_MODE === 'true',
   LOG_LEVEL       : process.env.LOG_LEVEL || 'info',
-  AWS             : {}
+  AWS             : {},
+
+  CRON_TIME       : process.env.CRON_TIME || '* */6 * * *',
 };
 
 try{
