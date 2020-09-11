@@ -194,7 +194,7 @@ const backup = async ()=>{
             const snapshotName          = `${new Date().getTime()}`;
             const localBackupFileName   = `${snapshotName}.tar.gz`;
             const localBackupFolder     = './backup-files';
-            const solrBackupFolder      = '/tmp/solr-backups';
+            const solrBackupFolder      = '/var/solr/data/backups';
 
             try{
                 winston.debug('Initial cleanup')
