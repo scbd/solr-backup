@@ -202,7 +202,7 @@ const backup = async ()=>{
             try{
                 winston.debug('Initial cleanup')
                 //Delete folders incase they were left from previous run
-                await cleanup(solrContainer, solrBackupFolder, localBackupFolder);
+                // await cleanup(solrContainer, solrBackupFolder, localBackupFolder);
             }
             catch(e){}
 
@@ -248,7 +248,7 @@ const backup = async ()=>{
 
                         await uploadToS3(localBackupFileName, localBackupFilePath);
 
-                        await cleanup(solrContainer, solrBackupFolder, localBackupFolder);
+                        // await cleanup(solrContainer, solrBackupFolder, localBackupFolder);
                     }
                 }
                 catch(e){
