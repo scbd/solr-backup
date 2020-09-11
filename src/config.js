@@ -7,7 +7,7 @@ const config = {
 
   NODE_ENV        : process.env.NODE_ENV,
   DEBUG_MODE      : process.env.DEBUG_MODE === 'true',
-  LOG_LEVEL       : process.env.LOG_LEVEL || 'info',
+  LOG_LEVEL       : process.env.LOG_LEVEL || (process.env.DEBUG_MODE === 'true' ? 'debug':'info'),
   AWS             : {},
 
   CRON_TIME       : process.env.CRON_TIME || '* */6 * * *',
