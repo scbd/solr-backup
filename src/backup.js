@@ -112,7 +112,7 @@ const dockerExec = async(container, cmd)=>{
 const cleanup = async (container, solrBackupDir, localeBackupDir)=>{
     winston.debug(`Begin cleanup`);
     
-    await dockerExec(container, ['rm -rf', `${solrBackupDir}`]);
+    await dockerExec(container, ['rm', '-rf', `${solrBackupDir}`]);
 
     await rmDir(localeBackupDir, true);
     //rmdir(localeBackupDir, { recursive: true })
