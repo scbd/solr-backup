@@ -100,13 +100,16 @@ const execCurl = async (container, url)=>{
 }
 
 const dockerExec = async(container, cmd)=>{
+    winston.debug(`executing cmd: ${cmd}`)
     const bashContainer = await container.exec.create({
         AttachStdout: true,
         AttachStderr: true,
         Cmd:  cmd
     });
 
-    await bashContainer.start({ Detach: false });
+    const stream = await bashContainer.start({ Detach: false });
+    let output = await promisifyStream(stream);
+    winston.debug(output)
 }
 
 const cleanup = async (container, solrBackupDir, localeBackupDir)=>{
