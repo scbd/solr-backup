@@ -17,6 +17,9 @@ let S3 = new AWS.S3({
     apiVersion      : '2006-03-01'
 });
 
+const sleep = (time)=> new Promise((resolve)=>setTimeout(resolve, time)); 
+
+
 const getCollectionNames = (collections)=>{
     winston.debug('Getting collection list')
 
@@ -36,19 +39,47 @@ const getCollectionNames = (collections)=>{
 const backupCollection = async (container, collection, path, backupName)=>{
 
     winston.info(`Executing backup for collection ${collection}`)
+    // Begin Backup
 
-    const url = `${config.SOLR_URL}/solr/${collection}/replication?command=backup&location=${path}&name=${backupName}`
-    const response = await execCurl(container, url);
+    const solrUrl           = `${config.SOLR_URL}/solr/${collection}/replication`;
+    const backupUrl         = `${solrUrl}?command=backup&location=${path}&name=${backupName}`;
+    const backupDetailsUrl  = `${solrUrl}?command=details`;
+    
+    const response = await execCurl(container, backupUrl);
 
     if(response.status != 'OK'){
         winston.error(`Solr backup failed for collection ${collection}`, response)
         return;
     }
 
+    //Wait for backup to finish
+    const backupStatusDetails = await backupStatus(container, backupDetailsUrl, backupName, 0);
+
     winston.debug('Collection backup finished');
 
     return `${path}/snapshot.${backupName}`;
 }
+
+const backupStatus = async (container, backupDetailsUrl, backupName, counter) => {
+
+    const backupStatusDetails = await execCurl(container, backupDetailsUrl);
+    winston.debug(`verifying backup status for ${backupName}`);
+
+    if(backupStatusDetails.status != 'OK'){
+        winston.error(`Solr backup failed for collection ${backupName}`, backupStatusDetails)
+        throw new Error(`Solr backup failed for collection ${backupName}`);
+    }
+    if(backupStatusDetails.details && backupStatusDetails.details.backup){
+        if(backupStatusDetails.details.backup.includes(backupName))
+            return backupStatusDetails;
+    }
+
+    if(counter < 20){
+        await sleep(10000) // sleep for 10 seconds
+        const res = (await backupStatus(container, backupDetailsUrl, backupName, counter+1));
+        return res;
+    }
+};
 
 const promisifyStream = (stream, returnOutput) => new Promise((resolve, reject) => {
     let output;
@@ -249,13 +280,20 @@ const backup = async ()=>{
 
                         await uploadToS3(localBackupFileName, localBackupFilePath);
 
-                        await cleanup(solrContainer, solrBackupFolder, localBackupFolder);
+                        winston.debug(`Finished backup for collection ${collectionNames[index]}`)
                     }
                 }
                 catch(e){
                     winston.error(`Error occurred while taking collection backup`, e);
                 }
             }
+
+            try{
+                winston.debug('Final cleanup')
+                await cleanup(solrContainer, solrBackupFolder, localBackupFolder);
+            }
+            catch(e){}
+
             winston.info(`Finished Solr backup process`);
         }
     }
