@@ -26,9 +26,14 @@ try{
     winston.info(`Next Schedule ${job.nextDate()}`)
   }
 
-  job = new CronJob(config.CRON_TIME, onTick);
-  showNextSchedule();
-  job.start();
+  if(process.env.LOCAL_ENV == 'true'){
+      (async ()=>await backupSolr())()
+  }
+  else{
+    job = new CronJob(config.CRON_TIME, onTick);
+    showNextSchedule();
+    job.start();
+  }
 }
 catch(e){
   winston.error(e);
