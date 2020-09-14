@@ -195,7 +195,7 @@ const backup = async ()=>{
         if(collectionNames.length>0){
 
             const snapshotName          = `${new Date().getTime()}`;
-            const localBackupFileName   = `${snapshotName}.tar.gz`;
+            const localBackupFileExt    = `tar.gz`;
             const localBackupFolder     = './backup-files';
             const solrBackupFolder      = '/var/solr/data/backups';
 
@@ -229,9 +229,11 @@ const backup = async ()=>{
 
                 try{
                     
-                    const solrBackupPath = await backupCollection(solrContainer, collectionNames[index], solrBackupFolder, `${collectionNames[index]}_${snapshotName}`);
 
-                    const localBackupFilePath = `${localBackupFolder}/${localBackupFileName}`;
+                    const collectionSnapshot = `${collectionNames[index]}_${snapshotName}`;
+                    const solrBackupPath = await backupCollection(solrContainer, collectionNames[index], solrBackupFolder, collectionSnapshot);
+
+                    const localBackupFilePath = `${localBackupFolder}/${solrBackupPath.replace(solrBackupFolder+'/', '')}.${localBackupFileExt}`;
 
                     if(solrBackupPath){
                         winston.debug(`Reading backup from container`);
