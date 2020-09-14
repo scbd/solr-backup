@@ -230,8 +230,11 @@ const backup = async ()=>{
                 try{
                     
 
-                    const collectionSnapshot = `${collectionNames[index]}_${snapshotName}`;
-                    const solrBackupPath = await backupCollection(solrContainer, collectionNames[index], solrBackupFolder, collectionSnapshot);
+                    const collectionSnapshot    = `${collectionNames[index]}_${snapshotName}`;
+                    const solrBackupPath        = await backupCollection(solrContainer, collectionNames[index], solrBackupFolder, collectionSnapshot);
+                    
+                    const localBackupFileName   = `${solrBackupPath.replace(solrBackupFolder+'/', '')}.${localBackupFileExt}`;
+                    const localBackupFilePath   = `${localBackupFolder}/localBackupFileName`;
 
                     const localBackupFilePath = `${localBackupFolder}/${solrBackupPath.replace(solrBackupFolder+'/', '')}.${localBackupFileExt}`;
 
