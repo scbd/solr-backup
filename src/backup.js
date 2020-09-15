@@ -91,24 +91,27 @@ const promisifyStream = (stream, returnOutput) => new Promise((resolve, reject) 
 });
 
 
-const uploadToS3 = async (name, filePath) =>{
+const uploadToS3 = (name, filePath) =>{
 
     winston.debug('Uploading file to S3');
 
-    const bucket =  config.S3_BUCKET;
-    const key = `${config.S3_BUCKET_FOLDER}/${name}`;
-
-    const fileBody = await fsp.readFile(`./${filePath}`);
+    const stream     = require('stream');
+    let   streamPass = new stream.PassThrough();
+    const bucket     = config.S3_BUCKET;
+    const key        = `${config.S3_BUCKET_FOLDER}/${name}`;
 
     let s3Options =  {
         Bucket      : bucket, 
         Key         : key,
-        Body        : fileBody
+        Body        : streamPass
     };
 
-    let s3File = await S3.putObject(s3Options).promise();
+    const s3Promise = S3.upload(s3Options).promise();
 
-    winston.debug('S3 upload finished');
+    return { 
+        s3Pipe:streamPass, 
+        s3Promise 
+    };
 }
 
 const execCurl = async (container, url)=>{
@@ -269,16 +272,16 @@ const backup = async ()=>{
 
                     if(solrBackupPath){
                         winston.debug(`Reading backup from container`);
-                        const stream = await solrContainer.fs.get({path:solrBackupPath});
 
-                        const file = fs.createWriteStream(localBackupFilePath);
+                        const { s3Pipe, s3Promise } = uploadToS3(localBackupFileName, localBackupFilePath);
+                        const stream                = await solrContainer.fs.get({path:solrBackupPath});
+                        const gz                    = zlib.createGzip();
 
-                        const gz = zlib.createGzip();
-                        stream.pipe(gz).pipe(file);
-
+                        stream.pipe(gz).pipe(s3Pipe);
                         await promisifyStream(stream);
 
-                        await uploadToS3(localBackupFileName, localBackupFilePath);
+                        await s3Promise;
+                        winston.debug('S3 upload finished');
 
                         winston.debug(`Finished backup for collection ${collectionNames[index]}`)
                     }
