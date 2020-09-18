@@ -65,10 +65,12 @@ const backupStatus = async (container, backupDetailsUrl, backupName, counter) =>
     const backupStatusDetails = await execCurl(container, backupDetailsUrl);
     winston.debug(`verifying backup status for ${backupName}`);
 
-    if(backupStatusDetails.status != 'OK'){
-        winston.error(`Solr backup failed for collection ${backupName}`, backupStatusDetails)
-        throw new Error(`Solr backup failed for collection ${backupName}`);
-    }
+    // if(backupStatusDetails.status != 'OK'){
+    //     // if(!backupStatusDetails.details || !backupStatusDetails.details.backup || !backupStatusDetails.details.backup.includes("success")){        
+    //         winston.error(`Solr backup failed for collection ${backupName}`, backupStatusDetails)
+    //         throw new Error(`Solr backup failed for collection ${backupName}`);
+    //     }
+    // }
     if(backupStatusDetails.details && backupStatusDetails.details.backup){
         if(backupStatusDetails.details.backup.includes(backupName))
             return backupStatusDetails;
@@ -115,6 +117,7 @@ const uploadToS3 = (name, filePath) =>{
 }
 
 const execCurl = async (container, url)=>{
+    
     winston.debug(`Executing curl for ${url}`);
     const bashContainer = await container.exec.create({
         AttachStdout: true,
@@ -125,6 +128,7 @@ const execCurl = async (container, url)=>{
     const stream = await bashContainer.start({ Detach: false });
 
     let output = await promisifyStream(stream);
+
     output = output.substring(output.indexOf('{'), output.lastIndexOf('}')+1)
     
     winston.debug(`Curl execution finished`);
@@ -164,7 +168,7 @@ const rmDir = async function(dir, rmSelf) {
         files = await fsp.readdir(dir); 
     } 
     catch (e) { 
-        console.log("!Oops, directory not exist."); 
+        winston.info("!Oops, directory not exist."); 
         return; 
     }
     if (files.length > 0) {
@@ -202,6 +206,7 @@ const backup = async ()=>{
 
         winston.info(`Starting Solr backup `);
         const list = await docker.container.list();
+       
         const solrContainer = list.find(e=> {
             
             //skip self
@@ -231,7 +236,7 @@ const backup = async ()=>{
             const snapshotName          = `${new Date().getTime()}`;
             const localBackupFileExt    = `tar.gz`;
             const localBackupFolder     = './backup-files';
-            const solrBackupFolder      = '/var/solr/data/backups';
+            const solrBackupFolder      = config.SOLR_BACKUP_FOLDER;
 
             try{
                 winston.debug('Initial cleanup')
@@ -256,7 +261,7 @@ const backup = async ()=>{
                     await dockerExec(solrContainer, ['mkdir', `${solrBackupFolder}`]);
                 }
                 catch(e){
-                    console.log(e)
+                    winston.info(e)
                 }
 
             for (let index = 0; index < collectionNames.length; index++) {
