@@ -42,8 +42,8 @@ const backupCollection = async (container, collection, path, backupName)=>{
     // Begin Backup
 
     const solrUrl           = `${config.SOLR_URL}/solr/${collection}/replication`;
-    const backupUrl         = `${solrUrl}?command=backup&location=${path}&name=${backupName}`;
-    const backupDetailsUrl  = `${solrUrl}?command=details`;
+    const backupUrl         = `${solrUrl}?command=backup&location=${path}&name=${backupName}&wt=json`;
+    const backupDetailsUrl  = `${solrUrl}?command=details&wt=json`;
     
     const response = await execCurl(container, backupUrl);
 
@@ -222,7 +222,7 @@ const backup = async ()=>{
             return;
         }
 
-        const collections      = await execCurl(solrContainer, `${config.SOLR_URL}/solr/admin/cores`);
+        const collections      = await execCurl(solrContainer, `${config.SOLR_URL}/solr/admin/cores?wt=json`);
         const collectionNames  = getCollectionNames(collections);
         // bashContainer.kill();
 
