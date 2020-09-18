@@ -32,6 +32,7 @@ try{
   else{
     winston.info('Starting SOLR backup scheduler');
     winston.info(`CRON schedule: ${config.CRON_TIME}`);
+    
     job = new CronJob(config.CRON_TIME, onTick);
     showNextSchedule();
     job.start();

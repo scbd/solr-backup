@@ -1,21 +1,20 @@
-const config  = require('./config');
-const winston = require('./logger')(__filename);
-const request = require('superagent');
-const AWS     = require('aws-sdk');
-const fsp     = require('fs').promises;
-const fs      = require('fs');
-var zlib      = require('zlib');
+const config    = require('./config');
+const winston   = require('./logger')(__filename);
+const request   = require('superagent');
+const AWS       = require('aws-sdk');
+const fsp       = require('fs').promises;
+const fs        = require('fs');
+var zlib        = require('zlib');
 
-const {Docker} = require('node-docker-api');
-
-const docker   = new Docker({ socketPath: '/var/run/docker.sock' });
-
-let S3 = new AWS.S3({
-    accessKeyId     : config.AWS.accessKeyId,
-    secretAccessKey : config.AWS.secretAccessKey,
-    region          : 'us-east-1',
-    apiVersion      : '2006-03-01'
-});
+const {Docker}  = require('node-docker-api');
+const docker    = new Docker({ socketPath: '/var/run/docker.sock' });
+const S3        = new AWS.S3({
+                                accessKeyId     : config.AWS.accessKeyId,
+                                secretAccessKey : config.AWS.secretAccessKey,
+                                region          : 'us-east-1',
+                                apiVersion      : '2006-03-01'
+                            });
+const s3UploadStream  = require('s3-upload-stream')(S3)
 
 const sleep = (time)=> new Promise((resolve)=>setTimeout(resolve, time)); 
 
@@ -97,23 +96,36 @@ const uploadToS3 = (name, filePath) =>{
 
     winston.debug('Uploading file to S3');
 
-    const stream     = require('stream');
-    let   streamPass = new stream.PassThrough();
+    // const stream     = require('stream');
+    // let   streamPass = new stream.PassThrough();
     const bucket     = config.S3_BUCKET;
     const key        = `${config.S3_BUCKET_FOLDER}/${name}`;
 
     let s3Options =  {
         Bucket      : bucket, 
         Key         : key,
-        Body        : streamPass
+        // Body        : streamPass
     };
 
-    const s3Promise = S3.upload(s3Options).promise();
+    const s3Stream = s3UploadStream.upload(s3Options);//.promise();
 
-    return { 
-        s3Pipe:streamPass, 
-        s3Promise 
-    };
+    // Handle errors.
+    s3Stream.on('error', function (error) {
+        winston.debug('S3 Upload error', error);
+    });
+    s3Stream.on('part', function (details) {
+        winston.debug('S3 Upload part', details);
+    });
+    s3Stream.on('uploaded', function (details) {
+        winston.debug('S3 Upload uploaded', details);
+    });
+
+    return s3Stream;
+//     return { s3Promise
+//         s3Pipe:streamPass, 
+//         s3Promise 
+//     };
+
 }
 
 const execCurl = async (container, url)=>{
@@ -278,14 +290,14 @@ const backup = async ()=>{
                     if(solrBackupPath){
                         winston.debug(`Reading backup from container`);
 
-                        const { s3Pipe, s3Promise } = uploadToS3(localBackupFileName, localBackupFilePath);
-                        const stream                = await solrContainer.fs.get({path:solrBackupPath});
-                        const gz                    = zlib.createGzip();
+                        const s3Pipe = uploadToS3(localBackupFileName, localBackupFilePath);//{ s3Pipe, s3Promise }
+                        const stream = await solrContainer.fs.get({path:solrBackupPath});
+                        const gz     = zlib.createGzip();
 
                         stream.pipe(gz).pipe(s3Pipe);
                         await promisifyStream(stream);
 
-                        await s3Promise;
+                        // await s3Promise;
                         winston.debug('S3 upload finished');
 
                         winston.debug(`Finished backup for collection ${collectionNames[index]}`)
