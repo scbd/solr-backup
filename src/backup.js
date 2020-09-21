@@ -302,8 +302,8 @@ const backup = async ()=>{
 
                         const stream = await solrContainer.fs.get({path:solrBackupPath});
                         const file = fs.createWriteStream(localBackupFilePath);
-                        const gz = zlib.createGzip();
-                        stream.pipe(gz).pipe(file);
+                        // const gz = zlib.createGzip();
+                        stream.pipe(file);
                         await promisifyStream(stream);
 
                         // await s3Promise;
