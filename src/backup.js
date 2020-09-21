@@ -290,11 +290,16 @@ const backup = async ()=>{
                     if(solrBackupPath){
                         winston.debug(`Reading backup from container`);
 
-                        const s3Pipe = uploadToS3(localBackupFileName, localBackupFilePath);//{ s3Pipe, s3Promise }
+                        // const s3Pipe = uploadToS3(localBackupFileName, localBackupFilePath);//{ s3Pipe, s3Promise }
                         const stream = await solrContainer.fs.get({path:solrBackupPath});
-                        const gz     = zlib.createGzip();
+                        // const gz     = zlib.createGzip();
 
-                        stream.pipe(gz).pipe(s3Pipe);
+                        // stream.pipe(gz).pipe(s3Pipe);
+                        const file = fs.createWriteStream(localBackupFilePath);
+
+                        const gz = zlib.createGzip();
+                        stream.pipe(gz).pipe(file);
+
                         await promisifyStream(stream);
 
                         // await s3Promise;
