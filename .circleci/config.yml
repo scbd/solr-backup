@@ -3,6 +3,9 @@ version: 2
 _defaults: &defaults
   docker:
     - image: docker:18.06.1-ce
+      auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS 
   working_directory: ~/scbd/solr-backup
   parallelism: 1
 
@@ -36,9 +39,9 @@ jobs:
       - deploy:
           name: Deploy branch build to docker hub 
           command:  |
+            eval "echo Branch:"{$CIRCLE_BRANCH}" User:"{$CIRCLE_PROJECT_USERNAME}" - "$CIRCLE_PROJECT_REPONAME:$CIRCLE_BRANCH           
             docker login -u $DOCKER_USER -p $DOCKER_PASS
             docker tag output scbd/$CIRCLE_PROJECT_REPONAME:$CIRCLE_BRANCH
-            eval "echo Branch:"{$CIRCLE_BRANCH}" User:"{$CIRCLE_PROJECT_USERNAME}" - "$CIRCLE_PROJECT_REPONAME:$CIRCLE_BRANCH
             docker push scbd/$CIRCLE_PROJECT_REPONAME:$CIRCLE_BRANCH
   build_and_deploy_releases:
     <<: *defaults
