@@ -4,6 +4,7 @@ const config = {
   SOLR_URL                : process.env.SOLR_URL                  || 'http://localhost:8983',
   SOLR_CONTAINER_NAME     : process.env.SOLR_CONTAINER_NAME   ,
   SOLR_CONTAINER_IMAGE    : process.env.SOLR_CONTAINER_IMAGE  ,
+  SOLR_BACKUP_FOLDER      : process.env.SOLR_BACKUP_FOLDER        || '/var/solr/data/backups',
 
   NODE_ENV        : process.env.NODE_ENV,
   DEBUG_MODE      : process.env.DEBUG_MODE === 'true',

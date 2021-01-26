@@ -12,6 +12,7 @@
     "aws-sdk": "2.738.0",
     "cron": "1.8.2",
     "node-docker-api": "1.1.22",
+    "s3-upload-stream": "^1.0.7",
     "superagent": "6.0.0",
     "winston": "3.3.3"
   }

@@ -1,21 +1,21 @@
-const config  = require('./config');
-const winston = require('./logger')(__filename);
-const request = require('superagent');
-const AWS     = require('aws-sdk');
-const fsp     = require('fs').promises;
-const fs      = require('fs');
-var zlib      = require('zlib');
+const config    = require('./config');
+const winston   = require('./logger')(__filename);
+const request   = require('superagent');
+const AWS       = require('aws-sdk');
+const fsp       = require('fs').promises;
+const fs        = require('fs');
+var zlib        = require('zlib');
 
-const {Docker} = require('node-docker-api');
-
-const docker   = new Docker({ socketPath: '/var/run/docker.sock' });
-
-let S3 = new AWS.S3({
-    accessKeyId     : config.AWS.accessKeyId,
-    secretAccessKey : config.AWS.secretAccessKey,
-    region          : 'us-east-1',
-    apiVersion      : '2006-03-01'
-});
+const {Docker}  = require('node-docker-api');
+const { resolve } = require('path');
+const docker    = new Docker({ socketPath: '/var/run/docker.sock' });
+const S3        = new AWS.S3({
+                                accessKeyId     : config.AWS.accessKeyId,
+                                secretAccessKey : config.AWS.secretAccessKey,
+                                region          : 'us-east-1',
+                                apiVersion      : '2006-03-01'
+                            });
+const s3UploadStream  = require('s3-upload-stream')(S3)
 
 const sleep = (time)=> new Promise((resolve)=>setTimeout(resolve, time)); 
 
@@ -54,7 +54,7 @@ const backupCollection = async (container, collection, path, backupName)=>{
 
     //Wait for backup to finish
     const backupStatusDetails = await backupStatus(container, backupDetailsUrl, backupName, 0);
-
+    
     winston.debug('Collection backup finished');
 
     return `${path}/snapshot.${backupName}`;
@@ -63,11 +63,14 @@ const backupCollection = async (container, collection, path, backupName)=>{
 const backupStatus = async (container, backupDetailsUrl, backupName, counter) => {
 
     const backupStatusDetails = await execCurl(container, backupDetailsUrl);
+   
     winston.debug(`verifying backup status for ${backupName}`);
 
     if(backupStatusDetails.status != 'OK'){
-        winston.error(`Solr backup failed for collection ${backupName}`, backupStatusDetails)
-        throw new Error(`Solr backup failed for collection ${backupName}`);
+        if(!backupStatusDetails.details || !backupStatusDetails.details.backup || !backupStatusDetails.details.backup.includes("success")){        
+            winston.error(`Solr backup failed for collection ${backupName}`, backupStatusDetails)
+            throw new Error(`Solr backup failed for collection ${backupName}`);
+        }
     }
     if(backupStatusDetails.details && backupStatusDetails.details.backup){
         if(backupStatusDetails.details.backup.includes(backupName))
@@ -81,12 +84,17 @@ const backupStatus = async (container, backupDetailsUrl, backupName, counter) =>
     }
 };
 
-const promisifyStream = (stream, returnOutput) => new Promise((resolve, reject) => {
+const promisifyStream = (stream, skipOutput) => new Promise((resolve, reject) => {
     let output;
-    stream.on('data', data => {
-        output += data.toString();
+    stream.on('data', data => {        
+        if(!skipOutput){
+            output += data.toString();
+        }
     })
-    stream.on('end', ()=>resolve(output))
+    stream.on('end', ()=>{
+        resolve(output)
+        output = undefined;
+    })
     stream.on('error', reject)
 });
 
@@ -95,31 +103,48 @@ const uploadToS3 = (name, filePath) =>{
 
     winston.debug('Uploading file to S3');
 
-    const stream     = require('stream');
-    let   streamPass = new stream.PassThrough();
     const bucket     = config.S3_BUCKET;
     const key        = `${config.S3_BUCKET_FOLDER}/${name}`;
 
     let s3Options =  {
         Bucket      : bucket, 
         Key         : key,
-        Body        : streamPass
     };
 
-    const s3Promise = S3.upload(s3Options).promise();
+    const s3Stream = s3UploadStream.upload(s3Options);//.promise();
+
+    const s3Promise = new Promise((resolve, reject)=>{ 
+
+        s3Stream.on('error', function (error) {// Handle errors.
+            winston.debug('S3 Upload error', error);
+            reject(error)
+        });
+
+        s3Stream.on('part', function (details) {
+            winston.debug('S3 Upload part', details);
+        });
+
+        s3Stream.on('uploaded', function (details) {
+            winston.debug('S3 Upload uploaded', details);
+            resolve(details);
+        });
+
+    });
 
     return { 
-        s3Pipe:streamPass, 
+        s3Pipe      :s3Stream, 
         s3Promise 
     };
+
 }
 
 const execCurl = async (container, url)=>{
+    
     winston.debug(`Executing curl for ${url}`);
     const bashContainer = await container.exec.create({
         AttachStdout: true,
         AttachStderr: true,
-        Cmd: [ 'curl', url ]
+        Cmd: [ 'curl', '-s', url ]
     });
 
     const stream = await bashContainer.start({ Detach: false });
@@ -128,6 +153,9 @@ const execCurl = async (container, url)=>{
     output = output.substring(output.indexOf('{'), output.lastIndexOf('}')+1)
     
     winston.debug(`Curl execution finished`);
+
+    // wired case where SOP chars are coming
+    output = output.replace(/\t|\n/g, '').replace(/[^\x20-\x7E]+_/ig, '');
 
     return JSON.parse(output)
 
@@ -164,7 +192,7 @@ const rmDir = async function(dir, rmSelf) {
         files = await fsp.readdir(dir); 
     } 
     catch (e) { 
-        console.log("!Oops, directory not exist."); 
+        winston.info("!Oops, directory not exist."); 
         return; 
     }
     if (files.length > 0) {
@@ -202,6 +230,7 @@ const backup = async ()=>{
 
         winston.info(`Starting Solr backup `);
         const list = await docker.container.list();
+       
         const solrContainer = list.find(e=> {
             
             //skip self
@@ -231,7 +260,7 @@ const backup = async ()=>{
             const snapshotName          = `${new Date().getTime()}`;
             const localBackupFileExt    = `tar.gz`;
             const localBackupFolder     = './backup-files';
-            const solrBackupFolder      = '/var/solr/data/backups';
+            const solrBackupFolder      = config.SOLR_BACKUP_FOLDER;
 
             try{
                 winston.debug('Initial cleanup')
@@ -256,7 +285,7 @@ const backup = async ()=>{
                     await dockerExec(solrContainer, ['mkdir', `${solrBackupFolder}`]);
                 }
                 catch(e){
-                    console.log(e)
+                    winston.info(e)
                 }
 
             for (let index = 0; index < collectionNames.length; index++) {
@@ -273,14 +302,16 @@ const backup = async ()=>{
                     if(solrBackupPath){
                         winston.debug(`Reading backup from container`);
 
-                        const { s3Pipe, s3Promise } = uploadToS3(localBackupFileName, localBackupFilePath);
-                        const stream                = await solrContainer.fs.get({path:solrBackupPath});
-                        const gz                    = zlib.createGzip();
+                        const { s3Pipe, s3Promise } = uploadToS3(localBackupFileName, localBackupFilePath);                        
 
-                        stream.pipe(gz).pipe(s3Pipe);
-                        await promisifyStream(stream);
+                        const stream = await solrContainer.fs.get({path:solrBackupPath});
+                        winston.debug(`Finished downloading file from Solr container to ${solrBackupPath}`);
+
+                        stream.pipe(s3Pipe)
+                        await promisifyStream(stream, true);
 
                         await s3Promise;
+
                         winston.debug('S3 upload finished');
 
                         winston.debug(`Finished backup for collection ${collectionNames[index]}`)
