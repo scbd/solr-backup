@@ -1,13 +1,9 @@
 const config    = require('./config');
 const winston   = require('./logger')(__filename);
-const request   = require('superagent');
 const AWS       = require('aws-sdk');
 const fsp       = require('fs').promises;
-const fs        = require('fs');
-var zlib        = require('zlib');
 
 const {Docker}  = require('node-docker-api');
-const { resolve } = require('path');
 const docker    = new Docker({ socketPath: '/var/run/docker.sock' });
 const S3        = new AWS.S3({
                                 accessKeyId     : config.AWS.accessKeyId,
