@@ -2,10 +2,10 @@ version: 2
 
 _defaults: &defaults
   docker:
-    - image: docker:18.06.1-ce
+    - image: docker:19.03.13-git
       auth:
-          username: $DOCKER_USER
-          password: $DOCKER_PASS 
+        username: $DOCKER_USER
+        password: $DOCKER_PASS 
   working_directory: ~/scbd/solr-backup
   parallelism: 1
 
@@ -14,11 +14,12 @@ _run:
     name: Build docker image
     command: |
       docker info
-      docker login -u $DOCKER_USER -p $DOCKER_PASS
+      docker login -u $DOCKER_USER -p $DOCKER_PASS      
       docker build -t output --build-arg COMMIT=$CIRCLE_SHA1 .
   testImage: &testImage
-    name: Test docker image 
+    name: Test docker image
     command:  |
+      docker login -u $DOCKER_USER -p $DOCKER_PASS
       docker run --name solr-backup -d -p 7070:7070 output;sleep 10;
 jobs:
   build:
@@ -29,7 +30,7 @@ jobs:
       - run: *buildDocker
       - run: *testImage
 
-  build-deploy-branches:
+  build_and_deploy_branches:
     <<: *defaults
     steps:
       - checkout
@@ -37,12 +38,12 @@ jobs:
       - run: *buildDocker
       - run: *testImage
       - deploy:
-          name: Deploy branch build to docker hub 
+          name: Deploy branch to docker hub 
           command:  |
-            eval "echo Branch:"{$CIRCLE_BRANCH}" User:"{$CIRCLE_PROJECT_USERNAME}" - "$CIRCLE_PROJECT_REPONAME:$CIRCLE_BRANCH           
             docker login -u $DOCKER_USER -p $DOCKER_PASS
             docker tag output scbd/$CIRCLE_PROJECT_REPONAME:$CIRCLE_BRANCH
             docker push scbd/$CIRCLE_PROJECT_REPONAME:$CIRCLE_BRANCH
+            
   build_and_deploy_releases:
     <<: *defaults
     steps:
@@ -51,11 +52,12 @@ jobs:
       - run: *buildDocker
       - run: *testImage
       - deploy:
-          name: Deploy release build to docker hub 
-          command:  |            
+          name: Deploy release to docker hub 
+          command:  |
             docker login -u $DOCKER_USER -p $DOCKER_PASS
             docker tag output scbd/$CIRCLE_PROJECT_REPONAME:release-${CIRCLE_BRANCH//release\//}
             docker push scbd/$CIRCLE_PROJECT_REPONAME:release-${CIRCLE_BRANCH//release\//}
+            
   build_and_deploy_tags:
     <<: *defaults
     steps:
@@ -64,10 +66,11 @@ jobs:
       - run: *buildDocker
       - run: *testImage
       - deploy:
-          name: Deploy tag build to docker hub 
+          name: Deploy tag to docker hub 
           command:  |
             if [ "${CIRCLE_PROJECT_USERNAME}" == 'scbd' ]; then
               docker login -u $DOCKER_USER -p $DOCKER_PASS
+              # bash -c "! docker pull scbd/$CIRCLE_PROJECT_REPONAME:${CIRCLE_TAG//v/}"
               docker tag output scbd/$CIRCLE_PROJECT_REPONAME:${CIRCLE_TAG//v/}
               docker tag output scbd/$CIRCLE_PROJECT_REPONAME:latest
               docker push scbd/$CIRCLE_PROJECT_REPONAME:${CIRCLE_TAG//v/}
@@ -90,12 +93,11 @@ workflows:
             tags:
               ignore:
                 - /^v?[0-9]+(\.[0-9]+)*$/
-                
-      - build-deploy-branches:
+      - build_and_deploy_branches:
           context: docker-hub
           filters:
             branches:
-              only: /^(dev|stg)$/
+              only: /^(master|dev|stg)$/
       - build_and_deploy_releases:
           context: docker-hub
           filters:
