@@ -82,10 +82,11 @@ const backupStatus = async (container, backupDetailsUrl, backupName, counter) =>
     }
 };
 
-const promisifyStream = (stream, returnOutput) => new Promise((resolve, reject) => {
+const promisifyStream = (stream, noOutput) => new Promise((resolve, reject) => {
     let output;
     stream.on('data', data => {
-        output += data.toString();
+        if(!noOutput)
+            output += data.toString();
     })
     stream.on('end', ()=>{
         resolve(output)
@@ -304,7 +305,7 @@ const backup = async ()=>{
                         const file = fs.createWriteStream(localBackupFilePath);
                         // const gz = zlib.createGzip();
                         stream.pipe(file);
-                        await promisifyStream(stream);
+                        await promisifyStream(stream, true);
 
                         // await s3Promise;
                         winston.debug('S3 upload finished');
