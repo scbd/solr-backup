@@ -50,7 +50,7 @@ jobs:
       - deploy:
           name: Deploy release build to docker hub 
           command:  |            
-            docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+            docker login -u $DOCKER_USER -p $DOCKER_PASS
             docker tag output scbd/$CIRCLE_PROJECT_REPONAME:release-${CIRCLE_BRANCH//release\//}
             docker push scbd/$CIRCLE_PROJECT_REPONAME:release-${CIRCLE_BRANCH//release\//}
   build_and_deploy_tags:
@@ -64,7 +64,7 @@ jobs:
           name: Deploy tag build to docker hub 
           command:  |
             if [ "${CIRCLE_PROJECT_USERNAME}" == 'scbd' ]; then
-              docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+              docker login -u $DOCKER_USER -p $DOCKER_PASS
               docker tag output scbd/$CIRCLE_PROJECT_REPONAME:${CIRCLE_TAG//v/}
               docker tag output scbd/$CIRCLE_PROJECT_REPONAME:latest
               docker push scbd/$CIRCLE_PROJECT_REPONAME:${CIRCLE_TAG//v/}
