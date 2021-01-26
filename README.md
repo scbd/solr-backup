@@ -1,5 +1,7 @@
 # docker-solr-backup
 
+SOLR backup solution for Solr instances running inside docker
+
 ## Docker Example Build
 ```
 docker build -t scbd/solr-backup:test .
