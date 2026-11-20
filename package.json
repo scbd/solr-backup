@@ -4,10 +4,13 @@
   "description": "SOLR backup solution for Solr instances running inside docker",
   "main": "backup.js",
   "scripts": {
-    "test": "node backup.js"
+    "test": "node --test \"test/**/*.test.js\""
   },
   "author": "Blaise Fonseca",
   "license": "MIT",
+  "engines": {
+    "node": "^22.23.4 || ^24.22.1 || >=26.12.1"
+  },
   "dependencies": {
     "aws-sdk": "2.738.0",
     "cron": "1.8.2",

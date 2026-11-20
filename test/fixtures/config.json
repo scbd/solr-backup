@@ -1,0 +1,8 @@
+{
+  "awsAccessKeys": {
+    "global": {
+      "accessKeyId": "dummy-test-key",
+      "secretAccessKey": "dummy-test-secret"
+    }
+  }
+}
