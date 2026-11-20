@@ -4,7 +4,7 @@
   "description": "SOLR backup solution for Solr instances running inside docker",
   "main": "backup.js",
   "scripts": {
-    "test": "node backup.js"
+    "test": "node --test \"test/**/*.test.js\""
   },
   "author": "Blaise Fonseca",
   "license": "MIT",
